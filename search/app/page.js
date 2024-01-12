@@ -3,30 +3,30 @@
 import 'bootstrap/dist/css/bootstrap.min.css';
 import React, {useEffect, useMemo, useRef, useState} from "react";
 import {useSortBy, useTable} from "react-table";
-import Image from "next/image";
-
+import debounce from 'lodash/debounce';
+import { BiSearch,BiX } from "react-icons/bi";
 import InfiniteScroll from "react-infinite-scroll-component";
-import {BiChevronUp} from "react-icons/bi";
+import {BiChevronDown, BiChevronUp} from "react-icons/bi";
 
 export default function Home() {
 
   const scrollRef = useRef(null);
-    const [rowData, setRowData] = useState([]);
+   
  
-
+  
     const [fullData, setFullData] = useState([]); // Store all the data
     const [visibleData, setVisibleData] = useState([]); // Data currently visible in the table
-
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filterData, setFilterData] = useState([]);
     const [hasMore, setHasMore] = useState(true); // Whether more data is available
     const PAGE_SIZE = 50;
 
 
     useEffect(() => {
         fetchData();
-        const intervalId = setInterval(fetchData, 60 * 1000);
-        // Clean up the interval when the component unmounts
-        return () => clearInterval(intervalId);
     }, []);
+
+  
 
     const columns = useMemo(
         () => [
@@ -43,7 +43,7 @@ export default function Home() {
                 accessor: "isbn",
             },
             {
-                Header: "Product Form",
+                Header: "ProductForm",
                 accessor: "ProductForm",
             },
             {
@@ -52,7 +52,7 @@ export default function Home() {
             },
 
             {
-                Header: "Publishing Agency/Publisher Name",
+                Header: "Publishing Agency/Publisher",
                 accessor: "publisher",
             },
             {
@@ -71,7 +71,7 @@ export default function Home() {
     const fetchData = async () => {
         try {
           
-        
+            console.log("call");
             const response = await fetch(
                 "http://localhost:8000/books/viewbooks"
             );
@@ -80,13 +80,13 @@ export default function Home() {
             }
              
          
-         
+            
             const fetchedData = await response.json();
-
+           
       
             setFullData(fetchedData);
             setVisibleData(fetchedData.slice(0, PAGE_SIZE));
-   
+        
         } catch (error) {
             console.error("Error fetching data:", error.message);
         }
@@ -99,6 +99,10 @@ export default function Home() {
         setHasMore(currentLength + PAGE_SIZE < fullData.length);
     };
 
+    const filteredData = (fullData,searchQuery)=>{
+          return fullData.filter((item)=> item.isbn.includes(searchQuery));
+    }
+    
     const {
         getTableProps,
         getTableBodyProps,
@@ -106,7 +110,7 @@ export default function Home() {
         rows,
         prepareRow,
     } = useTable(
-        {columns, data: visibleData},
+        {columns, data: (filterData.length!==0)?filterData: visibleData},
         useSortBy
     );
     const scrollToBottom = () => {
@@ -122,16 +126,51 @@ export default function Home() {
         });
     };
 
+    const handleSearchClick = () => {
+      const result = filteredData(fullData, searchQuery);
+      setFilterData(result);
+    };
+  
+    const handleClearClick = () => {
+      setSearchQuery('');
+      setFilterData([]);  // Reset filterData when clearing the search
+    };
+
   return (
     <>
        <div style={{marginTop: "50px"}}>
-                     
+       <div className="container mx-auto">
+  
+          <div className="mb-4 input-group">
+        
+            <input
+              type="text"
+              placeholder="Enter ISBN"
+              className="form-control mx-auto w-50"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <button
+              className="btn btn-primary"
+              onClick={handleSearchClick}
+            >
+              <BiSearch />
+            </button>
+            {searchQuery && (
+              <button
+                className="btn btn-secondary"
+                onClick={handleClearClick}
+              >
+                <BiX />
+              </button>
+            )}
+          </div>
 
                         <div  className=" h-[500px]">
                             <table
                                 {...getTableProps()}
-                                className=" divide-y divide-gray-200"
-                                style={{maxWidth: "80%"}}
+                                className="table table-bordered "
+                                style={{maxWidth: "100%"}}
                                 ref={scrollRef}
                             >
                                 <thead className={"sticky top-0"}>
@@ -143,7 +182,7 @@ export default function Home() {
                                                 {...column.getHeaderProps(
                                                     column.getSortByToggleProps()
                                                 )}
-                                                className="px-4 py-2 text-sm sm:text-base md:text-lg lg:text-xl xl:text-xl"
+                                                className="px-4 py-2 text-sm sm:text-base "
                                             >
                                                 {column.render("Header")}
                                                 {column.isSorted && (
@@ -164,7 +203,7 @@ export default function Home() {
                                                     <td
                                                         key={index}
                                                         {...cell.getCellProps()}
-                                                        className="px-4 py-2 text-sm sm:text-base md:text-lg lg:text-xl xl:text-xl"
+                                                        className="px-4 py-2 text-sm sm:text-base"
                                                     >
                                                         {cell.render("Cell")}
                                                     </td>
@@ -176,22 +215,19 @@ export default function Home() {
                                 </tbody>
 
                             </table>
+                            </div>
                             <button
                                 onClick={scrollToBottom}
-                                className="bg-sky-800 hover:bg-sky-600 text-white py-1 px-1 rounded fixed bottom-10 right-2"
+                                className="btn btn-secondary fixed bottom-10 right-2"
                             >
-                                <Image
-                                    src="/scroll-down.png"
-                                    alt="Scrolldown"
-                                    width={20}
-                                    height={20}
-                                />
+                              <BiChevronDown className='{"h-5 w-5"}'/>
+                              
                             </button>
                             <button
                                 onClick={scrollToUp}
-                                className="bg-sky-800 hover:bg-sky-600 text-white py-1 px-1 rounded fixed bottom-20 right-2"
+                                className="btn btn-secondary fixed bottom-20 right-2"
                             >
-                                <BiChevronUp className={"h-5 w-5"}/>
+                                <BiChevronUp className='{"h-5 w-5"}'/>
 
                             </button>
 
@@ -201,7 +237,6 @@ export default function Home() {
                             dataLength={visibleData.length}
                             next={fetchMoreData}
                             hasMore={hasMore}
-                            loader={<h4 className="text-sky-800">Loading...</h4>}
                             style={{overflow: "hidden"}}/>
 
        </div>
