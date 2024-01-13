@@ -43,16 +43,12 @@ export default function Home() {
                 accessor: "isbn",
             },
             {
-                Header: "ProductForm",
-                accessor: "ProductForm",
-            },
-            {
                 Header: "Language",
                 accessor: "language",
             },
 
             {
-                Header: "Publishing Agency/Publisher",
+                Header:"Publisher",
                 accessor: "publisher",
             },
             {
@@ -60,8 +56,16 @@ export default function Home() {
                 accessor: "author_editor",
             },
             {
-                Header: "Publication Date",
-                accessor: "Date",
+                Header: "Date",
+                accessor: (row)=>{
+                  const fullDate = row.Date;
+                  if(fullDate){
+
+                    const year =new Date(fullDate).getFullYear();
+                    return year;
+                  }
+                  return "";
+                }
             },
             
         ],
@@ -83,7 +87,7 @@ export default function Home() {
             
             const fetchedData = await response.json();
            
-      
+            
             setFullData(fetchedData);
             setVisibleData(fetchedData.slice(0, PAGE_SIZE));
         
@@ -141,7 +145,7 @@ export default function Home() {
        <div style={{marginTop: "50px"}}>
        <div className="container mx-auto">
   
-          <div className="mb-4 input-group">
+          <div className="mb-4 w-50 mx-auto input-group">
         
             <input
               type="text"
@@ -166,10 +170,10 @@ export default function Home() {
             )}
           </div>
 
-                        <div  className=" h-[500px]">
+                        <div  className=" h-[500px] ">
                             <table
                                 {...getTableProps()}
-                                className="table table-bordered "
+                                className="table table-bordered table-hover"
                                 style={{maxWidth: "100%"}}
                                 ref={scrollRef}
                             >
@@ -182,7 +186,7 @@ export default function Home() {
                                                 {...column.getHeaderProps(
                                                     column.getSortByToggleProps()
                                                 )}
-                                                className="px-4 py-2 text-sm sm:text-base "
+                                                className="px-3 py-2 text-sm sm:text-base bg-primary text-white"
                                             >
                                                 {column.render("Header")}
                                                 {column.isSorted && (
@@ -203,7 +207,7 @@ export default function Home() {
                                                     <td
                                                         key={index}
                                                         {...cell.getCellProps()}
-                                                        className="px-4 py-2 text-sm sm:text-base"
+                                                        className="px-3 py-2 text-sm sm:text-base"
                                                     >
                                                         {cell.render("Cell")}
                                                     </td>
