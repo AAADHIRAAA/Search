@@ -1,32 +1,28 @@
-
 "use client";
 import 'bootstrap/dist/css/bootstrap.min.css';
 import React, {useEffect, useMemo, useRef, useState} from "react";
 import {useSortBy, useTable} from "react-table";
-import debounce from 'lodash/debounce';
-import { BiSearch,BiX } from "react-icons/bi";
+import {BiChevronDown, BiChevronUp, BiX} from "react-icons/bi";
 import InfiniteScroll from "react-infinite-scroll-component";
-import {BiChevronDown, BiChevronUp} from "react-icons/bi";
+
 
 export default function Home() {
 
-  const scrollRef = useRef(null);
-   
- 
-  
+    const scrollRef = useRef(null);
+
+    const [fetchedData, setFetchedData] = useState();
     const [fullData, setFullData] = useState([]); // Store all the data
     const [visibleData, setVisibleData] = useState([]); // Data currently visible in the table
     const [searchQuery, setSearchQuery] = useState('');
     const [filterData, setFilterData] = useState([]);
     const [hasMore, setHasMore] = useState(true); // Whether more data is available
-    const PAGE_SIZE = 50;
+    const [page, setPage] = useState(1);
 
 
     useEffect(() => {
         fetchData();
     }, []);
 
-  
 
     const columns = useMemo(
         () => [
@@ -48,7 +44,7 @@ export default function Home() {
             },
 
             {
-                Header:"Publisher",
+                Header: "Publisher",
                 accessor: "publisher",
             },
             {
@@ -57,56 +53,62 @@ export default function Home() {
             },
             {
                 Header: "Date",
-                accessor: (row)=>{
-                  const fullDate = row.Date;
-                  if(fullDate){
+                accessor: (row) => {
+                    const fullDate = row.Date;
+                    if (fullDate) {
 
-                    const year =new Date(fullDate).getFullYear();
-                    return year;
-                  }
-                  return "";
+                        const year = new Date(fullDate).getFullYear();
+                        return year;
+                    }
+                    return "";
                 }
             },
-            
+
         ],
         []
     );
 
     const fetchData = async () => {
+
         try {
-          
-            console.log("call");
+            console.log("call", page)
+
             const response = await fetch(
-                "http://localhost:8000/books/viewbooks"
+                `http://localhost:8000/books/viewbooks?page=${page}`
             );
             if (!response.ok) {
-                throw new Error(`HTTP error! Status: ${response.status}`);
+                console.error(`HTTP error! Status: ${response.status}`);
             }
-             
-         
-            
-            const fetchedData = await response.json();
-           
-            
-            setFullData(fetchedData);
-            setVisibleData(fetchedData.slice(0, PAGE_SIZE));
-        
+
+            const fetchedDatum = await response.json();
+            setFetchedData(fetchedDatum);
+
         } catch (error) {
+            setPage(prevState=>prevState);
             console.error("Error fetching data:", error.message);
         }
     };
-    const fetchMoreData = () => {
-      console.log("Fetching")
-        const currentLength = visibleData.length;
-        const nextData = fullData.slice(currentLength, currentLength + PAGE_SIZE);
-        setVisibleData([...visibleData, ...nextData]);
-        setHasMore(currentLength + PAGE_SIZE < fullData.length);
-    };
 
-    const filteredData = (fullData,searchQuery)=>{
-          return fullData.filter((item)=> item.isbn.includes(searchQuery));
+    const fetchMore = () =>{
+        console.log("fetch more")
+        fetchData().then();
     }
-    
+
+    useEffect(() => {
+        if (fetchedData) {
+            setFullData(prevFullData => {
+                const combinedData = [...prevFullData, ...fetchedData.data];
+                return Array.from(new Set(combinedData.map(JSON.stringify))).map(JSON.parse);
+            });
+            setHasMore(fetchedData.currentPage < fetchedData.totalPages);
+            setPage(fetchedData.currentPage+1);
+        }
+    }, [fetchedData]);
+
+    const filteredData = (fullData, searchQuery) => {
+        return fullData.filter((item) => item.isbn.includes(searchQuery));
+    }
+
     const {
         getTableProps,
         getTableBodyProps,
@@ -114,137 +116,171 @@ export default function Home() {
         rows,
         prepareRow,
     } = useTable(
-        {columns, data: (filterData.length!==0)?filterData: visibleData},
+        {columns, data: (filterData.length !== 0) ? filterData : fullData},
         useSortBy
     );
     const scrollToBottom = () => {
-        window.scrollTo({
-            top: document.body.scrollHeight,
-            behavior: "smooth",
-        });
+        const element = scrollRef.current;
+        if (element) {
+            element.scrollTo({
+                top: element.scrollHeight,
+                behavior: "smooth",
+            });
+        }
     };
     const scrollToUp = () => {
-        window.scrollTo({
-            top: 0,
-            behavior: "smooth",
-        });
+        const element = scrollRef.current;
+        if (element) {
+            element.scrollTo({
+                top: 0,
+                behavior: "smooth",
+            });
+        }
+
     };
 
     const handleSearchClick = () => {
-      const result = filteredData(fullData, searchQuery);
-      setFilterData(result);
+        const result = filteredData(fullData, searchQuery);
+        setFilterData(result);
     };
-  
+
     const handleClearClick = () => {
-      setSearchQuery('');
-      setFilterData([]);  // Reset filterData when clearing the search
+        setSearchQuery('');
+        setFilterData([]);  // Reset filterData when clearing the search
     };
 
-  return (
-    <>
-       <div style={{marginTop: "50px"}}>
-       <div className="container mx-auto">
-  
-          <div className="mb-4 w-50 mx-auto input-group">
-        
-            <input
-              type="text"
-              placeholder="Enter ISBN"
-              className="form-control mx-auto w-50"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <button
-              className="btn btn-primary"
-              onClick={handleSearchClick}
-            >
-              <BiSearch />
-            </button>
-            {searchQuery && (
-              <button
-                className="btn btn-secondary"
-                onClick={handleClearClick}
-              >
-                <BiX />
-              </button>
-            )}
-          </div>
+    useEffect(()=>{
+        handleSearchClick();
 
-                        <div  className=" h-[500px] ">
-                            <table
-                                {...getTableProps()}
-                                className="table table-bordered table-hover"
-                                style={{maxWidth: "100%"}}
-                                ref={scrollRef}
+    },[searchQuery])
+
+    const handleScroll = () => {
+        const element = scrollRef.current;
+        console.log("elecmet");
+        // Check if the scroll position is near the bottom
+        if (
+            (element.scrollHeight - element.scrollTop).toFixed(0) - 5 <
+            element.clientHeight &&
+            hasMore
+        ) {
+            fetchMore();
+        }
+    };
+
+    useEffect(() => {
+        const element = scrollRef.current;
+
+        if (element) {
+
+            element.addEventListener("scroll", handleScroll);
+
+            return () => {
+                element.removeEventListener("scroll", handleScroll);
+            };
+        }
+    }); // Add dependencies as needed
+
+    return (
+        <>
+            <div style={{marginTop: "50px"}} ref={scrollRef} className={"h-[90vh] overflow-x-auto"}>
+                <div className="container mx-auto">
+
+                    <div className="mb-4 w-50 mx-auto input-group">
+
+                        <input
+                            type="text"
+                            placeholder="Enter ISBN"
+                            className="form-control mx-auto w-50"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                        {/*<button*/}
+                        {/*    className="btn btn-primary"*/}
+                        {/*    onClick={handleSearchClick}*/}
+                        {/*>*/}
+                        {/*    <BiSearch/>*/}
+                        {/*</button>*/}
+                        {searchQuery && (
+                            <button
+                                className="btn btn-secondary"
+                                onClick={handleClearClick}
                             >
-                                <thead className={"sticky top-0"}>
-                                {headerGroups.map((headerGroup, index) => (
-                                    <tr key={index} {...headerGroup.getHeaderGroupProps()}>
-                                        {headerGroup.headers.map((column, index) => (
-                                            <th
-                                                key={index}
-                                                {...column.getHeaderProps(
-                                                    column.getSortByToggleProps()
-                                                )}
-                                                className="px-3 py-2 text-sm sm:text-base bg-primary text-white"
-                                            >
-                                                {column.render("Header")}
-                                                {column.isSorted && (
-                                                    <span>{column.isSortedDesc ? " ⬇️ " : " ⬆️ "}</span>
-                                                )}
-                                            </th>
-                                        ))}
+                                <BiX/>
+                            </button>
+                        )}
+                    </div>
+
+                    <div className=" " >
+                        <table
+                            {...getTableProps()}
+                            className="table table-bordered table-hover"
+                            style={{maxWidth: "100%"}}
+
+                        >
+                            <thead className={"sticky top-0"}>
+                            {headerGroups.map((headerGroup, index) => (
+                                <tr key={index} {...headerGroup.getHeaderGroupProps()}>
+                                    {headerGroup.headers.map((column, index) => (
+                                        <th
+                                            key={index}
+                                            {...column.getHeaderProps(
+                                                column.getSortByToggleProps()
+                                            )}
+                                            className="px-3 py-2 text-sm sm:text-base bg-primary text-white"
+                                        >
+                                            {column.render("Header")}
+                                            {column.isSorted && (
+                                                <span>{column.isSortedDesc ? " ⬇️ " : " ⬆️ "}</span>
+                                            )}
+                                        </th>
+                                    ))}
+                                </tr>
+                            ))}
+                            </thead>
+                            <tbody {...getTableBodyProps()}>
+                            {rows.map((row, rowIndex) => {
+                                prepareRow(row);
+                                return (
+                                    <tr key={rowIndex} {...row.getRowProps()}>
+                                        {row.cells.map((cell, index) => {
+                                            return (
+                                                <td
+                                                    key={index}
+                                                    {...cell.getCellProps()}
+                                                    className="px-3 py-2 text-sm sm:text-base"
+                                                >
+                                                    {cell.render("Cell")}
+                                                </td>
+                                            );
+                                        })}
                                     </tr>
-                                ))}
-                                </thead>
-                                <tbody {...getTableBodyProps()}>
-                                {rows.map((row, rowIndex) => {
-                                    prepareRow(row);
-                                    return (
-                                        <tr key={rowIndex} {...row.getRowProps()}>
-                                            {row.cells.map((cell, index) => {
-                                                return (
-                                                    <td
-                                                        key={index}
-                                                        {...cell.getCellProps()}
-                                                        className="px-3 py-2 text-sm sm:text-base"
-                                                    >
-                                                        {cell.render("Cell")}
-                                                    </td>
-                                                );
-                                            })}
-                                        </tr>
-                                    );
-                                })}
-                                </tbody>
+                                );
+                            })}
+                            </tbody>
 
-                            </table>
-                            </div>
-                            <button
-                                onClick={scrollToBottom}
-                                className="btn btn-secondary fixed bottom-10 right-2"
-                            >
-                              <BiChevronDown className='{"h-5 w-5"}'/>
-                              
-                            </button>
-                            <button
-                                onClick={scrollToUp}
-                                className="btn btn-secondary fixed bottom-20 right-2"
-                            >
-                                <BiChevronUp className='{"h-5 w-5"}'/>
+                        </table>
+                    </div>
+                    <button
+                        onClick={scrollToBottom}
+                        className="btn btn-secondary fixed bottom-10 right-2"
+                    >
+                        <BiChevronDown className='{"h-5 w-5"}'/>
 
-                            </button>
+                    </button>
+                    <button
+                        onClick={scrollToUp}
+                        className="btn btn-secondary fixed bottom-20 right-2"
+                    >
+                        <BiChevronUp className='{"h-5 w-5"}'/>
+
+                    </button>
 
 
-                        </div>
-                        <InfiniteScroll
-                            dataLength={visibleData.length}
-                            next={fetchMoreData}
-                            hasMore={hasMore}
-                            style={{overflow: "hidden"}}/>
+                </div>
 
-       </div>
-    </>
-  )
+
+            </div>
+        </>
+    )
 }
                             
