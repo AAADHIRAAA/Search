@@ -2,9 +2,9 @@
 import 'bootstrap/dist/css/bootstrap.min.css';
 import React, {useEffect, useMemo, useRef, useState} from "react";
 import {useSortBy, useTable} from "react-table";
-import {BiChevronDown, BiChevronUp, BiX} from "react-icons/bi";
+import {BiChevronDown, BiChevronUp, BiSearch,BiX} from "react-icons/bi";
 import InfiniteScroll from "react-infinite-scroll-component";
-
+import axios from 'axios';
 
 export default function Home() {
 
@@ -17,6 +17,7 @@ export default function Home() {
     const [filterData, setFilterData] = useState([]);
     const [hasMore, setHasMore] = useState(true); // Whether more data is available
     const [page, setPage] = useState(1);
+    const [count, setCount] = useState(0);
 
 
     useEffect(() => {
@@ -105,9 +106,9 @@ export default function Home() {
         }
     }, [fetchedData]);
 
-    const filteredData = (fullData, searchQuery) => {
-        return fullData.filter((item) => item.isbn.includes(searchQuery));
-    }
+    // const filteredData = (fullData, searchQuery) => {
+    //     return fullData.filter((item) => item.isbn.includes(searchQuery));
+    // }
 
     const {
         getTableProps,
@@ -116,7 +117,7 @@ export default function Home() {
         rows,
         prepareRow,
     } = useTable(
-        {columns, data: (filterData.length !== 0) ? filterData : fullData},
+        {columns, data: (visibleData.length !== 0) ? visibleData : fullData},
         useSortBy
     );
     const scrollToBottom = () => {
@@ -140,19 +141,47 @@ export default function Home() {
     };
 
     const handleSearchClick = () => {
-        const result = filteredData(fullData, searchQuery);
-        setFilterData(result);
+        axios.get(`http://localhost:8000/books/find/${searchQuery}`)
+                .then(response => {
+                console.log(response.data);
+                const fetchedData = response.data;
+                setVisibleData(fetchedData ? [fetchedData] : []);
+                // setFilterData(response.data);
+        })
+        .catch(error => {
+            console.error('Error fetching data:', error);
+        });
+
+        // const result = filteredData(fullData, searchQuery);
+        
     };
 
     const handleClearClick = () => {
         setSearchQuery('');
-        setFilterData([]);  // Reset filterData when clearing the search
+        setVisibleData([]);  // Reset filterData when clearing the search
     };
 
-    useEffect(()=>{
-        handleSearchClick();
+    const totalbooks = async()=>{
+        try{
 
-    },[searchQuery])
+            const response = await fetch('http://localhost:8000/books/count');
+            if (!response.ok) {
+                console.error(`HTTP error! Status: ${response.status}`);
+            }
+            const data = await response.json();
+            setCount(data);
+            console.log(data);
+        }
+        catch(error){
+            console.error("Error fetching Data",error);    
+        }
+    }
+
+    useEffect(()=>{
+       
+        totalbooks();
+    },[])
+
 
     const handleScroll = () => {
         const element = scrollRef.current;
@@ -194,12 +223,12 @@ export default function Home() {
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                         />
-                        {/*<button*/}
-                        {/*    className="btn btn-primary"*/}
-                        {/*    onClick={handleSearchClick}*/}
-                        {/*>*/}
-                        {/*    <BiSearch/>*/}
-                        {/*</button>*/}
+                        <button
+                            className="btn btn-primary"
+                          onClick={handleSearchClick}
+                        >
+                           <BiSearch/>
+                        </button>
                         {searchQuery && (
                             <button
                                 className="btn btn-secondary"
@@ -226,7 +255,7 @@ export default function Home() {
                                             {...column.getHeaderProps(
                                                 column.getSortByToggleProps()
                                             )}
-                                            className="px-3 py-2 text-sm sm:text-base bg-primary text-white"
+                                            className="px-2 py-2 text-sm sm:text-base bg-primary text-white"
                                         >
                                             {column.render("Header")}
                                             {column.isSorted && (
@@ -275,7 +304,11 @@ export default function Home() {
 
                     </button>
 
-
+                    <button
+                    className='fixed top-10 right-20'
+                    >
+                        Total Books: {count}
+                    </button>
                 </div>
 
 
